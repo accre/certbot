@@ -99,6 +99,53 @@ class _RFC2136Client(object):
         })
         self.algorithm = key_algorithm
 
+    def cname_check(record_name, quiet=false):
+        """
+        Check if record_name is a valid CNAME and if so return an
+        alternate record_name in the zone that the CNAME points to
+        for the TXT RR.
+
+        This is optional so simply return the input record_name on
+        any failure. 
+    
+        Developed by @hellermf
+        """
+        if quiet:
+          log = lambda *args, **kwargs: None
+        else:
+          log = logger.info
+    
+        log("Checking if %s is a CNAME...", record_name)
+        q = dns.message.make_query(record_name, dns.rdatatype.TXT, dns.rdataclass.IN)
+        try:
+            response = dns.query.tcp(q, self.server, port=self.port)
+        except Exception as e:
+             log("Exception %s during CNAME query, trying to continue asssuming no CNAME",
+                        str(type(e)))
+        try:
+            rcode = response.rcode()
+            if rcode == dns.rcode.NOERROR or rcode == dns.rcode.NXDOMAIN:
+                cname = None
+                for answer in response.answer:
+                    if (answer.rdtype != dns.rdatatype.CNAME
+                        or answer.rdclass != dns.rdataclass.IN):
+                        continue
+                    cname = answer.items[0].target.to_text()
+                if cname is not None:
+                    log("... %s -> %s", record_name, cname)
+                    return cname
+                else:
+                    log("... not a CNAME")
+            else:
+                log("CNAME query returned %s, continuing assuming no CNAME",
+                            dns.rcode.to_text(rcode))
+        except Exception as e:
+            log("Exception %s parsing CNAME check, continuing asssuming no CNAME",
+                        str(type(e)))
+            log('debug: {0}'.format(e))
+    
+        return record_name
+
     def add_txt_record(self, record_name, record_content, record_ttl):
         """
         Add a TXT record using the supplied information.
@@ -108,6 +155,8 @@ class _RFC2136Client(object):
         :param int record_ttl: The record TTL (number of seconds that the record may be cached).
         :raises certbot.errors.PluginError: if an error occurs communicating with the DNS server
         """
+
+        record_name = self.cname_check1(record_name)
 
         domain = self._find_domain(record_name)
 
@@ -143,6 +192,8 @@ class _RFC2136Client(object):
         :param int record_ttl: The record TTL (number of seconds that the record may be cached).
         :raises certbot.errors.PluginError: if an error occurs communicating with the DNS server
         """
+
+        record_name = self.cname_check1(record_name)
 
         domain = self._find_domain(record_name)
 
