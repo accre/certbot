@@ -99,7 +99,7 @@ class _RFC2136Client(object):
         })
         self.algorithm = key_algorithm
 
-    def cname_check(record_name, quiet=false):
+    def cname_check(self, record_name, quiet=False):
         """
         Check if record_name is a valid CNAME and if so return an
         alternate record_name in the zone that the CNAME points to
@@ -116,7 +116,7 @@ class _RFC2136Client(object):
           log = logger.info
     
         log("Checking if %s is a CNAME...", record_name)
-        q = dns.message.make_query(record_name, dns.rdatatype.TXT, dns.rdataclass.IN)
+        q = dns.message.make_query(record_name, dns.rdatatype.CNAME, dns.rdataclass.IN)
         try:
             response = dns.query.tcp(q, self.server, port=self.port)
         except Exception as e:
@@ -130,7 +130,7 @@ class _RFC2136Client(object):
                     if (answer.rdtype != dns.rdatatype.CNAME
                         or answer.rdclass != dns.rdataclass.IN):
                         continue
-                    cname = answer.items[0].target.to_text()
+                    cname = next(iter(answer.items)).target.to_text()
                 if cname is not None:
                     log("... %s -> %s", record_name, cname)
                     return cname
@@ -155,8 +155,7 @@ class _RFC2136Client(object):
         :param int record_ttl: The record TTL (number of seconds that the record may be cached).
         :raises certbot.errors.PluginError: if an error occurs communicating with the DNS server
         """
-
-        record_name = self.cname_check1(record_name)
+        record_name = self.cname_check(record_name)
 
         domain = self._find_domain(record_name)
 
@@ -192,8 +191,7 @@ class _RFC2136Client(object):
         :param int record_ttl: The record TTL (number of seconds that the record may be cached).
         :raises certbot.errors.PluginError: if an error occurs communicating with the DNS server
         """
-
-        record_name = self.cname_check1(record_name)
+        record_name = self.cname_check(record_name)
 
         domain = self._find_domain(record_name)
 
